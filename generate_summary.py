@@ -57,8 +57,8 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
         Returns:
             str: A formatted string containing df.info, df.head(5), and df.columns and top unique value counts for object columns.
         """
-        if not global_dataframes or not isinstance(global_dataframes[-1], pd.DataFrame):
-            return "No valid DataFrame found in the list."
+        # if not global_dataframes or not isinstance(global_dataframes[-1], pd.DataFrame):
+        #     return "No valid DataFrame found in the list."
 
         # Capture df.info() as string
         buffer = io.StringIO()
@@ -95,26 +95,50 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
     @classmethod
     def generate_questions(cls, basic_info: str) -> List[str]:
 
-        parser = PydanticOutputParser(pydantic_object=EDAQuestionsOutput)
+        # parser = PydanticOutputParser(pydantic_object=EDAQuestionsOutput)
         
+        # prompt_template_str = """
+        # You are a senior data analyst. Given the following comprehensive information about a DataFrame:
+
+        # {basic_info}
+
+        # Generate 10 high-quality questions that would help perform thorough exploratory data analysis.
+
+        # Focus your questions on:
+        # 1. Statistical Properties (e.g., distributions, correlations, aggregates)
+        # 2. Business Insights (e.g., KPIs, trends, segments)
+        # 3. Advanced Analysis (e.g., feature engineering, modeling ideas)
+
+        # {format_instructions}
+        # """
+        # prompt = ChatPromptTemplate.from_template(prompt_template_str)
+
+        # chain = prompt.partial(format_instructions=parser.get_format_instructions()) | llm | parser
+        # result: EDAQuestionsOutput = chain.invoke({"basic_info": basic_info})
+
         prompt_template_str = """
         You are a senior data analyst. Given the following comprehensive information about a DataFrame:
 
         {basic_info}
 
-        Generate 10-15 high-quality questions that would help perform thorough exploratory data analysis.
+        Generate s a overall summary of what this dataframe data looks like for the user.
+        
+        Then 10 high-quality questions that would help perform thorough exploratory data analysis.
 
         Focus your questions on:
         1. Statistical Properties (e.g., distributions, correlations, aggregates)
         2. Business Insights (e.g., KPIs, trends, segments)
         3. Advanced Analysis (e.g., feature engineering, modeling ideas)
 
-        {format_instructions}
+        Instructions:
+        - Give overall output in makrdown format.
+        - First Give Summary and then give questions in a list format.
         """
         prompt = ChatPromptTemplate.from_template(prompt_template_str)
 
-        chain = prompt.partial(format_instructions=parser.get_format_instructions()) | llm | parser
-        result: EDAQuestionsOutput = chain.invoke({"basic_info": basic_info})
+        chain = prompt | llm
+        result = chain.invoke({"basic_info": basic_info})
+
 
         cls.generated_eda_questions = result.questions
         return result.questions
@@ -137,18 +161,19 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
         # Step 1: Generate basic summary info
         basic_info: str = self.dataframe_basic_info(df=self.df)
 
-        # Step 2: Generate EDA questions
-        questions: List[str] = self.generate_questions(basic_info=basic_info)
+        # # Step 2: Generate EDA questions
+        # questions: List[str] = self.generate_questions(basic_info=basic_info)
 
-        # Step 3: Use agent to answer questions and compile markdown
-        report : str = self.generate_answer(questions=questions)
+        # # Step 3: Use agent to answer questions and compile markdown
+        # report : str = self.generate_answer(questions=questions)
 
         return report
 
-# Example usage
+if __name__ == "__main__":
+    # Example usage
 
-df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
-global_dataframes.append(df_forcast)
-df_summary_generator: GenerateFileSummary = DataFrameSummaryGenerator(data=global_dataframes[-1])
-summary = df_summary_generator.generate_summary()
-print(summary)
+    df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
+    global_dataframes.append(df_forcast)
+    df_summary_generator: GenerateFileSummary = DataFrameSummaryGenerator(data=global_dataframes[-1])
+    summary = df_summary_generator.generate_summary()
+    print(summary)
