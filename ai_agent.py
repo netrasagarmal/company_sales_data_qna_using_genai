@@ -1,134 +1,203 @@
-import pandas as pd
-import io
-import json
-import os
-from typing import List
-from pydantic import BaseModel, Field
-from langchain.output_parsers import StructuredOutputParser
-from langchain.prompts import ChatPromptTemplate
-from langchain.chat_models import ChatOpenAI  # Or your preferred model
-from langchain.output_parsers import PydanticOutputParser
+# from typing import Annotated, TypedDict
+# from langgraph.graph import StateGraph, START, END
+# from langgraph.graph.message import add_messages
+# import pandas as pd
+# import os, io
+# from typing import List
+# from langchain_experimental.agents import create_pandas_dataframe_agent
+# from dotenv import load_dotenv
+# from langchain_community.chat_models import ChatOpenAI
+
+# # Load environment variables from the .env file (if present)
+# load_dotenv()
+
+
+# # Initialize LLM
+# llm = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=os.getenv("OPENAI_API_KEY"))
+
+# # Define the global dataframe list
+# global_dataframes: List[pd.DataFrame] = []
+# df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
+# df_wine : pd.DataFrame = pd.read_csv('G:/company_sales_genai/company_sales_data_qna_using_genai/data/wine.csv')
+# global_dataframes.append(df_forcast)
+# global_dataframes.append(df_wine)
+
+# # Define the state schema
+# class State(TypedDict):
+#     messages: Annotated[list, add_messages]
+#     question: str
+
+# # Initialize the graph
+# graph_builder = StateGraph(State)
+
+# # Node function that matches expected return type
+# def get_answer_from_df(state: State) -> State:
+#     # answer = "Answer from DataFrame"  # Placeholder
+#     # prompt = """
+#     # You are a data analyst. You have two dataframes. Below given is a sequence of dataframes that would be given in input choose dataframe dumber accordingly to answer the question
+#     # Dataframe 1. df_forcast: A dataframe containing sales forecast data.
+#     # Dataframe 2. df_wine: A dataframe containing wine sales data.
+#     # You can use the dataframes to answer questions.
+#     # {}
+#     # """.format(state["messages"][-1].content)
+#     pandas_agent = create_pandas_dataframe_agent(llm=llm, df=[df_forcast,df_wine], verbose=True, allow_dangerous_code=True)
+#     response = pandas_agent.invoke({state["messages"][-1].content})
+#     # response = pandas_agent.invoke({state["messages"][-1].content})
+#     print(response, type(response))
+#     return {
+#         "messages": state["messages"] + [{"role": "assistant", "content": response["output"]}],
+#         "question": state["question"]
+#     }
+
+# # Build the graph
+# graph_builder.add_node("get_answer_from_df", get_answer_from_df)
+# graph_builder.set_entry_point("get_answer_from_df")
+# graph_builder.add_edge("get_answer_from_df", END)
+
+# # Compile the graph
+# graph = graph_builder.compile()
+
+# # Input
+# x = {
+#     "messages": [{"role": "user", "content": "give me shape of the forcast dataframe"}],
+#     "question": "give me info about the dataframe",
+# }
+
+# # Run the graph
+# y = graph.invoke(x)
+# # print(y, type(y))
+
+from typing import Annotated, TypedDict, List, Tuple, Dict, Union, Optional, Any
+from langgraph.graph import StateGraph, END
+# from langchain.core.runnable import Runnable
+from langgraph.graph.message import add_messages
 from langchain_experimental.agents import create_pandas_dataframe_agent
-
-# Import the necessary module
+from langchain_community.chat_models import ChatOpenAI
+import os, pandas as pd
 from dotenv import load_dotenv
-import os
 
-# Load environment variables from the .env file (if present)
+# Load .env values
 load_dotenv()
 
+# --- Define the Graph State Schema ---
+class State(TypedDict):
+    messages: Annotated[List, add_messages]
 
-# Initialize LLM
-llm = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=os.getenv("OPENAI_API_KEY"))
-
-
-# Global state
-global_dataframes: List[pd.DataFrame] = [df_forcast]
-global_summaries: List[Dict[str, Any]] = []
-
-
-
-def dataframe_basic_info():
+# --- Main Class ---
+class DocQA:
     """
-    Summarizes the last DataFrame in the provided list.
-    
-    Args:
-        global_dataframes (list): A list of pandas DataFrames.
-    
-    Returns:
-        str: A formatted string containing df.info, df.head(5), and df.columns and top unique value counts for object columns.
+    A class to handle document-based question answering using LangChain and Pandas.
     """
-    if not global_dataframes or not isinstance(global_dataframes[-1], pd.DataFrame):
-        return "No valid DataFrame found in the list."
 
-    df = global_dataframes[-1]
-
-    # Capture df.info() as string
-    buffer = io.StringIO()
-    df.info(buf=buffer)
-    info_str = buffer.getvalue()
-
-    # Capture df.head(5) and df.columns
-    head_str = df.head(5).to_string(index=True)
-    columns_str = ", ".join(df.columns.astype(str))
-
-    # Top unique values for object columns
-    unique_value_summary = "\n=== Top Unique Values in Object Columns ===\n"
-    obj_cols = df.select_dtypes(include='object').columns
-
-    if not obj_cols.empty:
-        for col in obj_cols:
-            value_counts = df[col].value_counts(dropna=False).head(10)
-            unique_value_summary += f"\nUnique Values in Column: {col}\n"
-            for val, count in value_counts.items():
-                unique_value_summary += f"  {repr(val)}: {count}\n"
-    else:
-        unique_value_summary += "No object columns found.\n"
-
-    # Combine all parts
-    summary = (
-        "=== DataFrame Info ===\n" + info_str +
-        "\n\n=== Column Names ===\n" + columns_str +
-        "\n === Top unique values for object columns ===\n" + unique_value_summary +
-        "\n=== Head (First 5 Rows) ===\n" + head_str
-    )
-
-    return summary
-
-# Define output schema
-class EDAQuestionsOutput(BaseModel):
-    questions: List[str] = Field(..., description="A list of EDA-related questions")
-
-# Create parser
-parser = PydanticOutputParser(pydantic_object=EDAQuestionsOutput)
-
-# Use a regular template with Jinja-style placeholders
-prompt_template_str = """
-You are a senior data analyst. Given the following comprehensive information about a DataFrame:
-
-{basic_info}
-
-Generate 10-15 high-quality questions that would help perform thorough exploratory data analysis.
-
-Focus your questions on:
-1. Statistical Properties (e.g., distributions, correlations, aggregates)
-2. Business Insights (e.g., KPIs, trends, segments)
-3. Advanced Analysis (e.g., feature engineering, modeling ideas)
-
-{format_instructions}
-"""
-
-prompt = ChatPromptTemplate.from_template(prompt_template_str)
-
-# Global list to store generated questions
-generated_eda_questions: List[str] = []
-
-def generate_questions(basic_info: str) -> List[str]:
-    global generated_eda_questions
-
-    chain = prompt.partial(format_instructions=parser.get_format_instructions()) | llm | parser
-    result: EDAQuestionsOutput = chain.invoke({"basic_info": basic_info})
-
-    generated_eda_questions = result.questions
-    return result.questions
+    def __init__(self):
+        self.df = None
+        self.llm = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=os.getenv("OPENAI_API_KEY"))
+        self.agent = None
+        self.graph = None
 
 
-
-# Create the pandas agent
-pandas_agent = create_pandas_dataframe_agent(llm, df_forcast, verbose=True, allow_dangerous_code=True)
-
-# Function to answer each EDA question and return markdown
-def generate_question_answer(questions: List[str]) -> str:
-    markdown_report = "# EDA Questions and Answers\n\n"
-
-    for i, question in enumerate(questions, 1):
+    def load_document(self, file_path: str, file_type: str, file_name: str)->Dict[str, Any]:
+        """
+        Load a document into the agent.
+        Args:
+            file_path (str): Path to the document.
+            file_type (str): Type of the document ('xlsx' or 'csv').
+            file_name (str): Name of the document.
+        Returns:
+            dict: Status of the loading process.
+        """
         try:
-            if i == 4:
-                break
+            if file_type == "xlsx":
+                self.df = pd.read_excel(file_path)
+            elif file_type == "csv":
+                self.df = pd.read_csv(file_path)
             else:
-                response = pandas_agent.invoke({question})
-                markdown_report += f"### {i}. {question}\n\n{response}\n\n"
+                raise ValueError("Unsupported file type. Please use 'xlsx' or 'csv'.")
+            
+            self.agent = create_pandas_dataframe_agent(
+                llm=self.llm,
+                df=self.df,
+                verbose=True,
+                handle_parsing_errors=True,
+                max_iterations=3,
+                allow_dangerous_code=True
+            )
+            self.graph = self._build_graph()
         except Exception as e:
-            markdown_report += f"### {i}. {question}\n\n❌ Error: {str(e)}\n\n"
+            print(f"Error loading document: {e}")
+            return {"status":"exception", "message": f"Exception in DocQa, load_document().\n Exception: \n{str(e)}"}
+        
+        return {"status":"success"}
 
-    return markdown_report
+
+        
+    # Define the node logic
+    def get_answer_from_df(self, state: State) -> State:
+        """
+        Get answer from the DataFrame based on the user's question.
+        Args:
+            state (State): The current state of the graph.
+        Returns:
+            State: The updated state with the answer.
+        """
+
+        question = state["messages"][-1].content
+        
+        response = self.agent.invoke({question})
+        print(response, type(response))
+        print("\n\n\n")
+        
+        return {
+            "messages": state["messages"] + [{"role": "assistant", "content": str(response["output"])}]
+        }
+    
+    def _build_graph(self):
+        """
+        Build the state graph for the question-answering process.
+        Returns:
+            StateGraph: The compiled state graph.
+        """
+
+        # Create a graph builder
+        graph_builder = StateGraph(State)
+
+        # Build graph
+        graph_builder.add_node("get_answer_from_df", self.get_answer_from_df)
+        graph_builder.set_entry_point("get_answer_from_df")
+        graph_builder.add_edge("get_answer_from_df", END)
+
+        return graph_builder.compile()
+
+    def ask(self, question: str) -> Union[str, dict]:
+        """
+        Ask a question to the agent and get the answer.
+        Args:
+            question (str): The question to ask.
+        Returns:
+            str: The answer from the agent.
+        """
+
+        # Construct initial state
+        state = {
+            "messages": [{"role": "user", "content": question}]
+        }
+        # Run the graph and return final message
+        result = self.graph.invoke(state)
+        return str(result["messages"][-1].content)
+    
+
+if __name__ == "__main__":
+    # Example usage
+    # df = pd.read_csv("sales_forecast.csv")
+    # df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
+    # df_wine : pd.DataFrame = pd.read_csv('G:/company_sales_genai/company_sales_data_qna_using_genai/data/wine.csv')
+    # global_dataframes.append(df_forcast)
+    # global_dataframes.append(df_wine)
+
+    # df = pd.read_csv("sales_forecast.csv")
+    # df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
+    qa_agent = DocQA()
+    qa_agent.load_document(file_path='G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx', file_type='xlsx', file_name='forcast.xlsx')
+
+    response = qa_agent.ask("give the list of all columns in the dataframe")
+    print(response)
