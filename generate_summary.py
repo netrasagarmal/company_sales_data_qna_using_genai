@@ -38,19 +38,12 @@ class GenerateFileSummary(ABC):
         pass
 
 
-# --- Output Schema for Questions ---
-# class EDAQuestionsOutput(BaseModel):
-#     questions: List[str] = Field(..., description="A list of EDA-related questions")
-
-class EDAOutput(BaseModel):
-    summary: str = Field(description="Markdown summary of the DataFrame")
-    questions: List[str] = Field(description="List of EDA questions")
-
-
 # --- Main Concrete Class ---
 class DataFrameSummaryGenerator(GenerateFileSummary):
-    # generated_eda_questions: List[str] = []
-    # generated_file_summary: str = ""
+    """
+    A concrete implementation of GenerateFileSummary that generates summaries and EDA questions from a DataFrame.
+    This class uses a language model to analyze the DataFrame and generate insights.
+    """
 
     def __init__(self, llm = None):
         super().__init__(llm=llm)
@@ -68,8 +61,6 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
         Returns:
             str: A formatted string containing df.info, df.head(5), and df.columns and top unique value counts for object columns.
         """
-        # if not global_dataframes or not isinstance(global_dataframes[-1], pd.DataFrame):
-        #     return "No valid DataFrame found in the list."
 
         # Capture df.info() as string
         buffer = io.StringIO()
@@ -103,181 +94,77 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
 
         return summary
 
-    @classmethod
-    def generate_questions(cls, basic_info: str) -> List[str]:
-
-        # parser = PydanticOutputParser(pydantic_object=EDAQuestionsOutput)
-        
-        # prompt_template_str = """
-        # You are a senior data analyst. Given the following comprehensive information about a DataFrame:
-
-        # {basic_info}
-
-        # Generate 10 high-quality questions that would help perform thorough exploratory data analysis.
-
-        # Focus your questions on:
-        # 1. Statistical Properties (e.g., distributions, correlations, aggregates)
-        # 2. Business Insights (e.g., KPIs, trends, segments)
-        # 3. Advanced Analysis (e.g., feature engineering, modeling ideas)
-
-        # {format_instructions}
-        # """
-        # prompt = ChatPromptTemplate.from_template(prompt_template_str)
-
-        # chain = prompt.partial(format_instructions=parser.get_format_instructions()) | llm | parser
-        # result: EDAQuestionsOutput = chain.invoke({"basic_info": basic_info})
-        
-        # = = = = = = = = = = = = = = = = 
-        
-        # prompt_template_str = """
-        # You are a senior data analyst. Given the following comprehensive information about a DataFrame:
-
-        # {basic_info}
-
-        # Generate s a overall summary of what this dataframe data looks like for the user.
-        
-        # Then 10 high-quality questions that would help perform thorough exploratory data analysis.
-
-        # Focus your questions on:
-        # 1. Statistical Properties (e.g., distributions, correlations, aggregates)
-        # 2. Business Insights (e.g., KPIs, trends, segments)
-        # 3. Advanced Analysis (e.g., feature engineering, modeling ideas)
-
-        # Instructions:
-        # - Give overall output in makrdown format.
-        # - First Give Summary and then give questions in a list format.
-        # """
-        # prompt = ChatPromptTemplate.from_template(prompt_template_str)
-
-        # chain = prompt | llm
-        # result = chain.invoke({"basic_info": basic_info})
-
-        # = = = = = = = = = = 
-
-        # output_parser = PydanticOutputParser(pydantic_object=EDAOutput)
-
-        # prompt_template_str = """
-        # You are a senior data analyst. Given the following information about a DataFrame:
-
-        # {basic_info}
-
-        # Generate:
-        # 1. A summary describing the DataFrame overall.
-        # 2. A list of 10 high-quality EDA questions.
-
-        # Focus your questions on:
-        # - Statistical Properties
-        # - Business Insights
-        # - Advanced Analysis
-
-        # Return your answer in **JSON format** as shown below:
-
-        # {format_instructions}
-        # """
-
-        # # Insert format instructions automatically
-        # prompt = ChatPromptTemplate.from_template(prompt_template_str).partial(
-        #     format_instructions=output_parser.get_format_instructions()
-        # )
-
-        # chain = prompt | llm | output_parser
-
-        # result = chain.invoke({"basic_info": basic_info})
-
-        # # result is now a Pydantic object
-        # summary_str = result.summary
-        # questions_list = result.questions
-
-        # cls.generated_eda_questions = result.questions
-        # return result.questions
-
-        pass
-
-    def generate_answer(self, questions: List[str]) -> str:
-        pass
-        # markdown_report = "# EDA Questions and Answers\n\n"
-
-        # for i, question in enumerate(questions, 1):
-        #     try:
-        #         if i == 4:  # optional limit
-        #             break
-        #         response = self.pandas_agent.invoke({question})
-        #         markdown_report += f"### {i}. {question}\n\n{response}\n\n"
-        #     except Exception as e:
-        #         markdown_report += f"### {i}. {question}\n\n❌ Error: {str(e)}\n\n"
-
-        # return markdown_report
-
     def generate_summary(self, df:pd.DataFrame, file_name: str = None, file_format: str = None) -> Tuple[str, List[str], str]:
-        # Step 1: Generate basic summary info
-        basic_info: str = self.dataframe_basic_info(df=df)
+        try:
 
-        # output_parser = PydanticOutputParser(pydantic_object=EDAOutput)
+            # Step 1: Generate basic summary info
+            basic_info: str = self.dataframe_basic_info(df=df)
 
-        # # Step 3: Get format instructions
-        # format_instructions = output_parser.get_format_instructions()
+            # 1. Define the response schema fields
+            response_schemas = [
+                ResponseSchema(name="summary", description="Markdown summary of the DataFrame", type="string"),
+                ResponseSchema(name="questions", description="List of 10 EDA questions", type="list", items_type="string")
+            ]
 
-        # 1. Define the response schema fields
-        response_schemas = [
-            ResponseSchema(name="summary", description="Markdown summary of the DataFrame", type="string"),
-            ResponseSchema(name="questions", description="List of 10 EDA questions", type="list", items_type="string")
-        ]
+            # 2. Create the parser
+            output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
-        # 2. Create the parser
-        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+            # 3. Get format instructions
+            format_instructions = output_parser.get_format_instructions()
 
-        # 3. Get format instructions
-        format_instructions = output_parser.get_format_instructions()
+            prompt_template = """
+            You are a senior data analyst. Given the following information about a DataFrame:
 
-        prompt_template = """
-        You are a senior data analyst. Given the following information about a DataFrame:
+            {basic_info}
 
-        {basic_info}
+            Generate:
+            1. A summary of what is the dataframe about (i.e. domain) and what data it contains.
+            2. A list of 10 high-quality EDA questions. Number the questions from 1 to 10.
 
-        Generate:
-        1. A summary of what is the dataframe about (i.e. domain) and what data it contains.
-        2. A list of 10 high-quality EDA questions.
+            Focus your questions on:
+            - Statistical Properties
+            - Business Insights
+            - Advanced Analysis
 
-        Focus your questions on:
-        - Statistical Properties
-        - Business Insights
-        - Advanced Analysis
+            Return your answer in **format** as shown below:
 
-        Return your answer in **format** as shown below:
+            {format_instructions}
+            """
+    
+            prompt = ChatPromptTemplate.from_template(prompt_template)
 
-        {format_instructions}
-        """
-        # .format(
-        #     basic_info,
-        #     format_instructions
-        # )
-        # 5. Combine prompt and model
-        prompt = ChatPromptTemplate.from_template(prompt_template)
+            # # 6. Use your model
+            # llm = ChatOpenAI(temperature=0)  # or use your LLM instance
 
-        # # 6. Use your model
-        # llm = ChatOpenAI(temperature=0)  # or use your LLM instance
+            chain = prompt | self.llm | output_parser
 
-        chain = prompt | llm | output_parser
+            # 7. Call the chain
+            result = chain.invoke({"basic_info": basic_info, "format_instructions" : format_instructions})
 
-        # 7. Call the chain
-        result = chain.invoke({"basic_info": basic_info, "format_instructions" : format_instructions})
+            print("\n\n Result:", result, "Type:", type(result))
 
-        print("\n\n Result:", result, "Type:", type(result))
+            # Result is parsed
+            summary_str = result["summary"] if "summary" in result else "No summary generated."
+            questions_list = result["questions"] if "questions" in result else []
 
-        # Result is parsed
-        summary_str = result["summary"] if "summary" in result else "No summary generated."
-        questions_list = result["questions"] if "questions" in result else []
+            questions_str = "\n".join(questions_list) if questions_list else "No questions generated."
 
-        questions_str = "\n".join(questions_list) if questions_list else "No questions generated."
+            final_summary = """## File Summary:\n\n##### File Name: {}\n##### File Format: {}\n##### Description:\n{}\n\n## Here are some questions that can be asked for EDA:\n{}.""".format(
+                file_name if file_name else "N/A",
+                file_format if file_format else "N/A",
+                summary_str,
+                questions_str
+            )
 
-        final_summary = """## File Summary:\n\n##### File Name: {}\n##### File Format: {}\n##### Description:\n{}\n\n## Here are some questions that can be asked for EDA:\n{}.""".format(
-            file_name if file_name else "N/A",
-            file_format if file_format else "N/A",
-            summary_str,
-            questions_str
-        )
-
-        return (summary_str, questions_list, final_summary)
+            return (summary_str, questions_list, final_summary)
+        except Exception as e:
+            print(f"Error generating summary: {e}")
+            # Handle the error gracefully, return empty strings or raise an exception
+            # You can also log the error if needed
+            raise 
+            # Optionally, you can raise an exception or log the error
+            # raise e
+            # Or return empty values
         # return ("", [], "")
     
 

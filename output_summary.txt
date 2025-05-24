@@ -1,18 +1,59 @@
+# Uploaded Files Summary
+
+## File Summary:
+
+##### File Name: emp_data.csv
+##### File Format: csv
+##### Description:
+The DataFrame contains information about employees, including their EmployeeID, Name, and DateOfJoining. There are 20 entries in total.
+
+## Here are some questions that can be asked for EDA:
+1. What is the average length of time employees have been with the company based on the DateOfJoining column?
+2. Are there any trends in the hiring patterns based on the DateOfJoining column?
+3. What is the distribution of employee names in terms of commonality?
+4. Is there a correlation between EmployeeID and DateOfJoining?
+5. How does the distribution of DateOfJoining vary across different departments or teams?
+6. Are there any outliers in terms of the length of employment?
+7. What is the most common starting month for new employees based on DateOfJoining?
+8. Are there any patterns in the EmployeeID assignment?
+9. How has the employee base grown over time based on the DateOfJoining?
+10. Can we predict future hiring trends based on the current data?.
+
 ## File Summary:
 
 ##### File Name: forcast.xlsx
 ##### File Format: xlsx
 ##### Description:
-The DataFrame contains data related to the sales, purchases, and inventory of various products in the 'AC' category for the brand 'HISENSE'. It includes information on product names, descriptions, types, statuses, and monthly sales figures from October to December of the previous year and January to September of the current year.
+The DataFrame contains data related to the sales and inventory of various products from a brand called HISENSE. It includes columns such as brand, product, product description, status, and monthly sales and inventory data. The products are categorized as air purifiers, portable ACs, and split ACs.
 
 ## Here are some questions that can be asked for EDA:
-1. What is the overall trend in sales volume from October to September?
-2. Which product has the highest average monthly sales?
-3. Are there any seasonal patterns in sales for specific products?
-4. How do purchase quantities correlate with sales volumes?
-5. Is there a relationship between product types and sales performance?
-6. What is the average inventory turnover rate for the products?
-7. Are there any outliers in the sales data that may indicate unusual behavior?
-8. How do sales in the current year compare to the same period in the previous year?
-9. Can we predict future sales based on past sales data?
-10. Is there a correlation between inventory levels and sales performance?.
+What is the average monthly sales quantity across all products?
+What is the distribution of sales status (HAND, PURCHASE, SALES) across different products?
+How do sales quantities vary month over month for each product category?
+What is the trend in sales for each product category over the months?
+Are there any seasonal patterns in sales for specific products?
+What is the overall inventory trend for the brand HISENSE?
+Which product has the highest average sales quantity per month?
+Is there any correlation between the sales of one product category and another?
+Can we predict future sales based on historical data using time series analysis?
+How does the sales performance of HISENSE products compare with competitors in the market?.
+
+## File Summary:
+
+##### File Name: wine.csv
+##### File Format: csv
+##### Description:
+The DataFrame contains data related to wines, including various attributes such as alcohol content, malic acid levels, color intensity, and more. There are 178 entries with 14 columns, mostly consisting of numerical values.
+
+## Here are some questions that can be asked for EDA:
+What is the distribution of alcohol content among the different types of wine?
+Is there a correlation between color intensity and proline content?
+What is the average ash content for each type of wine?
+Are there any outliers in the phenols column? How do they affect the overall analysis?
+How does malic acid content vary based on alcohol levels?
+What is the relationship between flavanoids and nonflavanoid phenols?
+Can we predict wine type based on the given attributes?
+What are the key factors influencing the quality of wine?
+Is there a seasonal pattern in wine production based on alcohol content?
+What clustering algorithms can be applied to segment the wines based on their characteristics?.
+

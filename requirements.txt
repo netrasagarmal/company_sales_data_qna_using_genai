@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+langchain
+langchain-openai
+langchain-community
+langchain_experimental
+langgraph
+langchain-text-splitters
+langchain-embeddings
+langchain-tools
+faiss-cpu
+streamlit
+pandas

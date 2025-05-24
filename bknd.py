@@ -64,7 +64,7 @@ async def delete_temp_file(json_payload:dict):
 
 
 @app.post("/upload_file")
-async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form(...))->JSONResponse :
+async def upload_file(file: UploadFile = File(...), json_data: str = Form(...))->JSONResponse :
     """
     Endpoint to upload a file and process it with DocQA.
     Args:
@@ -81,51 +81,48 @@ async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form
     if not file:
         return JSONResponse(status_code=400, content={"error": "No file provided"})
     
-    if session_id not in current_session:
-        current_session[session_id] = {}
-    
 
     response = None
     try:
+        # Custom directory where you want to save the file
+        # preferred_dir = "G:/company_sales_genai/company_sales_data_qna_using_genai/temp"
         preferred_dir = os.path.join(os.getcwd(), "temp")  # Use current working directory
         os.makedirs(preferred_dir, exist_ok=True)  # Ensure directory exists
 
-        file_paths = []
-        file_names = []
-        file_types = []
-        for file in files:
-            # contents = await file.read()
-            # Extract filename
-            file_name = file.filename
-            file_path = os.path.join(preferred_dir, file_name)
+        # Extract filename
+        filename = file.filename
+        file_path = os.path.join(preferred_dir, filename)
 
-            file_paths.append(file_path)
-            file_names.append(file_name)
+        # Write file to the preferred directory
+        with open(file_path, "wb") as buffer:
+            contents = await file.read()
+            buffer.write(contents)
 
-            if file_name.endswith(".xlsx"):
-                file_types.append("xlsx")
-            elif file_name.endswith(".csv"):
-                file_types.append("csv")
-            else:
-                return JSONResponse(status_code=400, content={"error": "Unsupported file type. Only .xlsx and .csv files are allowed."})
-            
+        # Separate file path and filename
+        file_name = os.path.basename(file_path)
+        full_file_path = os.path.abspath(file_path)
 
-            # Write file to the preferred directory
-            with open(file_path, "wb") as buffer:
-                contents = await file.read()
-                buffer.write(contents)
-            print(f"\n\nFile saved to {file_path}, filename: {file_name}")
+        print(f"\n\nFile saved to {full_file_path}, filename: {file_name}")
 
-        
+        # data = json.loads(json_data)
+        # print(data)
+        # session_id = data["session_id"]
 
-        print(f"files received, session id created, {session_id}, file paths: {file_paths}")
+        if session_id not in current_session:
+            current_session[session_id] = {}
+
+        print(f"file received, session id created, {session_id}, file path: {full_file_path}")
 
         # if session_id in current_session:
         
-        current_session[str(session_id)]["file_paths"] = file_paths
-        current_session[str(session_id)]["file_name"] = file_names
-        current_session[str(session_id)]["input_content"] = file_types
+        current_session[str(session_id)]["file_path"] = full_file_path
+        current_session[str(session_id)]["file_name"] = file_name
+        current_session[str(session_id)]["input_content"] = "file"
 
+        if file_name.endswith(".xlsx"):
+            current_session[str(session_id)]["file_type"] = "xlsx"
+        elif file_name.endswith(".csv"):
+            current_session[str(session_id)]["file_type"] = "csv"
         
         # else:
         #     return JSONResponse(status_code=400, content={"error": "session id not "})
@@ -162,41 +159,24 @@ def create_session():
 async def upload_files(files: List[UploadFile] = File(...)):
     preferred_dir = os.path.join(os.getcwd(), "temp")  # Use current working directory
     os.makedirs(preferred_dir, exist_ok=True)  # Ensure directory exists
-
-    file_paths = []
-    file_names = []
-    file_types = []
+    
+    results = []
     for file in files:
         # contents = await file.read()
         # Extract filename
-        file_name = file.filename
-        file_path = os.path.join(preferred_dir, file_name)
-
-        file_paths.append(file_path)
-        file_names.append(file_name)
+        filename = file.filename
+        file_path = os.path.join(preferred_dir, filename)
 
         # Write file to the preferred directory
         with open(file_path, "wb") as buffer:
             contents = await file.read()
             buffer.write(contents)
-        print(f"\n\nFile saved to {file_path}, filename: {file_name}")
-
-        if session_id not in current_session:
-            current_session[session_id] = {}
-
-        print(f"file received, session id created, {session_id}, file path: {full_file_path}")
-
-        # if session_id in current_session:
-        
-        current_session[str(session_id)]["file_path"] = full_file_path
-        current_session[str(session_id)]["file_name"] = file_name
-        current_session[str(session_id)]["input_content"] = "file"
-
-        if file_name.endswith(".xlsx"):
-            current_session[str(session_id)]["file_type"] = "xlsx"
-        elif file_name.endswith(".csv"):
-            current_session[str(session_id)]["file_type"] = "csv"
-        
+        print(f"\n\nFile saved to {file_path}, filename: {filename}")
+        results.append({
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "size": len(contents)
+        })
     return {"files": results}
 
 
