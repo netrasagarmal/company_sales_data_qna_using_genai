@@ -1,0 +1,18 @@
+## File Summary:
+
+##### File Name: forcast.xlsx
+##### File Format: xlsx
+##### Description:
+The DataFrame contains data related to the sales, purchases, and inventory of various products in the 'AC' category for the brand 'HISENSE'. It includes information on product names, descriptions, types, statuses, and monthly sales figures from October to December of the previous year and January to September of the current year.
+
+## Here are some questions that can be asked for EDA:
+1. What is the overall trend in sales volume from October to September?
+2. Which product has the highest average monthly sales?
+3. Are there any seasonal patterns in sales for specific products?
+4. How do purchase quantities correlate with sales volumes?
+5. Is there a relationship between product types and sales performance?
+6. What is the average inventory turnover rate for the products?
+7. Are there any outliers in the sales data that may indicate unusual behavior?
+8. How do sales in the current year compare to the same period in the previous year?
+9. Can we predict future sales based on past sales data?
+10. Is there a correlation between inventory levels and sales performance?.
