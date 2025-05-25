@@ -5,6 +5,8 @@ import uuid
 import json
 import requests
 from typing import List, Tuple, Dict, Union, Optional, Any
+from datetime import date
+from collections import defaultdict
 
 # Initialize session state variables
 if 'messages' not in st.session_state:
@@ -19,13 +21,10 @@ if 'text_pasted' not in st.session_state:
     st.session_state.text_pasted = False
 if 'session_id' not in st.session_state:
     st.session_state.session_id = None
-if 'file_name' not in st.session_state:
-    st.session_state.file_name = None
+if 'file_names' not in st.session_state:
+    st.session_state.file_names = defaultdict(dict)
 if 'text_content' not in st.session_state:
     st.session_state.text_content = None
-
-    
-
 
 # Welcome dialog - only show if not already done
 if not st.session_state.welcome_done:
@@ -33,15 +32,16 @@ if not st.session_state.welcome_done:
     st.write("This app allows you to upload a document or paste text, then ask questions about it.")
 
     
-    
+    uploaded_files = None
+    pasted_text = None
     # Options for input
     input_method = st.radio("Choose your input method:", ("Upload a file (PDF, TXT, DOCX, XLSX, CSV)", "Paste text directly"))
     
     # File upload or text area based on selection
     if input_method == "Upload a file (PDF, TXT, DOCX, XLSX, CSV)":
-        uploaded_file = st.file_uploader("Choose a file", type=['pdf', 'txt', 'docx', 'xlsx', 'csv'])
-        if uploaded_file is not None:
-            st.session_state.file_name = uploaded_file.name
+        uploaded_files = st.file_uploader("Choose a file(s)", type=['pdf', 'txt', 'docx', 'xlsx', 'csv'], accept_multiple_files=True)
+        if uploaded_files is not None:
+            # st.session_state.file_name = uploaded_file.name
             st.session_state.file_uploaded = True
     else:
         pasted_text = st.text_area("Paste your text here:", height=200)
@@ -62,18 +62,11 @@ if not st.session_state.welcome_done:
             st.toast('Please either upload a file or paste some text.', icon='⚠️')
         else:
             st.session_state.welcome_done = True
-            # Add welcome message from assistant
 
             st.session_state.messages.append({"role": "assistant", "content": "Welcome! I've processed your document. Here's a sample summary:"})
 
             with st.spinner("Wait for it...", show_time=True):
-                # time.sleep(2)
                 
-                # create_session_response = requests.get("http://localhost:8000/create_session")
-                # content = json.loads(create_session_response.content)
-                # st.session_state.session_id = content["session_id"]
-                # print(f"\n session id created : {st.session_state.session_id}")
-
                 max_retries = 4
                 retry_delay = 1  # seconds
                 create_session_response = None
@@ -106,11 +99,21 @@ if not st.session_state.welcome_done:
                     if st.session_state.file_uploaded == True:
                         print("\n\n\t inside file upload api \n\n")
                         json_payload = {"session_id":st.session_state.session_id}
-                        files = {
-                            "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type),
-                            "json_data": (None, json.dumps(json_payload), "application/json"),
-                            }
-                        
+                    
+                        files = []
+
+                        # Add all files under the field name 'files'
+                        for file in uploaded_files:
+                            files.append(
+                                ("files", (file.name, file.getvalue(), file.type))
+                            )
+                            st.session_state.file_names[file.name] = file.type
+
+                        # Add JSON payload as a form field
+                        files.append(
+                            ("json_data", (None, json.dumps(json_payload), "application/json"))
+                        )
+
                         upload_file_response = requests.post("http://localhost:8000/upload_file", files=files)
 
                         if upload_file_response.status_code != 200:
@@ -125,37 +128,27 @@ if not st.session_state.welcome_done:
                         st.session_state.messages.append({"role": "assistant", "content": st.session_state.summary})
                         st.session_state.messages.append({"role": "assistant", "content": "You can now ask me questions about your document."})
                         # create session backend api
-                        print(f"\n\nfile_uploaded, {uploaded_file}")
+                        print(f"\n\nfile_uploaded, {uploaded_files}")
                     
                     elif st.session_state.text_pasted == True:
                         print("\n\n\t inside abcdefgh \n\n")
-                        # json_payload = {
-                        #     "session_id": st.session_state.session_id,
-                        #     "input_text": st.session_state.text_content
-                        #     }
-                        # upload_text_response = requests.post("http://localhost:8000/upload_text", json=json_payload)
-                        # if upload_text_response.status_code != 200:
-                        #     st.error("Failed to upload text. Please try again.")
-                        #     st.rerun()
-                        # #create session backend api
-                        # print("\n\ntext uploaded")
-                        pass
+                        json_payload = {
+                            "session_id": st.session_state.session_id,
+                            "input_text": st.session_state.text_content
+                            }
+                        upload_text_response = requests.post("http://localhost:8000/upload_text", json=json_payload)
+                        if upload_text_response.status_code != 200:
+                            st.error("Failed to upload text. Please try again.")
+                            st.rerun()
+                        #create session backend api
+                        print("\n\ntext uploaded")
+                        
 
                     if st.session_state.file_uploaded == True and upload_file_response.status_code == 200:
                         #delete file
-                        delete_file_response = requests.post("http://localhost:8000/delete_temp_file", json={"session_id": st.session_state.session_id})
+                        delete_file_response = requests.delete("http://localhost:8000/delete_temp_file", json={"session_id": st.session_state.session_id})
                         content = json.loads(delete_file_response.content)
                         print(f"\n\nfile deleted, {content}")
-            
-                    # if st.session_state.session_id is not None:
-                    #     # Generate sample summary
-                    #     generate_summary_response = requests.post("http://localhost:8000/generate_summary", json={"session_id": st.session_state.session_id})
-                    #     content = json.loads(generate_summary_response.content)
-                    #     st.session_state.summary = content["file_summary"]
-                    #     st.session_state.messages.append({"role": "assistant", "content": st.session_state.summary})
-                    #     st.session_state.messages.append({"role": "assistant", "content": "You can now ask me questions about your document."})
-                # else:
-
             
             st.rerun()
     
@@ -212,20 +205,31 @@ with st.container():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        with st.popover("File Info"):
-            st.text(f"File Name: {st.session_state.file_name}")
-    with col2:
-        # Sample data to download
-        data = {
-            "name": "Document Chat Assistant",
-            "version": "1.0",
-            "features": ["chat", "document processing", "Q&A"]
-        }
+        # with st.popover("File Info"):
+        #     st.text(f"File Name: {st.session_state.file_name}")
+        # Dialog to show file info
+        @st.dialog("Uploaded File Info")
+        def show_file_info():
+            if st.session_state.file_names:
+                for file_name, file_type in st.session_state.file_names.items():
+                    st.write(f"📄 **{file_name}** — *{file_type}*")
+            else:
+                st.info("No files uploaded yet.")
 
-        # def download_chat()->dict:
-        #     c
-        # Convert to JSON string
-        json_string = json.dumps(st.session_state.messages, indent=4)
+        # Button to trigger dialog
+        if st.button("Show File Info"):
+            show_file_info()
+
+    with col2:
+
+        download_data = {
+            "date":date.today().strftime("%Y-%m-%d"),
+            "files": st.session_state.file_names,
+            "conversation": st.session_state.messages,
+            "api_key": st.session_state.api_key
+        }
+        
+        json_string = json.dumps(download_data, indent=4)
 
         # Download button
         st.download_button(
@@ -237,7 +241,13 @@ with st.container():
 
     with col3:
         if st.button("Reset"):
-            # Clear all session state variables
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+            delete_current_session_response = requests.post("http://localhost:8000/delete_session", json={"session_id": st.session_state.session_id})
+            if delete_current_session_response.status_code == 200:
+                print("Session deleted successfully.")
+                # Clear all session state variables
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                st.rerun()
+            else:
+                print("Failed to delete session.")
+                st.error("Failed to delete session. Please try again.")

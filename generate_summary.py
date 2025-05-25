@@ -9,19 +9,11 @@ from typing import List, Dict, Any, Tuple
 from pydantic import BaseModel, Field
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from langchain_community.chat_models import ChatOpenAI
-# from langchain.output_parsers import PydanticOutputParser
-# from langchain_experimental.agents import create_pandas_dataframe_agent
 from dotenv import load_dotenv
 
 # Load environment variables from the .env file (if present)
 load_dotenv()
 
-
-
-
-# # Global state
-# global_dataframes: List[pd.DataFrame] = []
-# global_summaries: List[Dict[str, Any]] = []
 
 # --- Abstract Base Class ---
 class GenerateFileSummary(ABC):
@@ -133,9 +125,6 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
     
             prompt = ChatPromptTemplate.from_template(prompt_template)
 
-            # # 6. Use your model
-            # llm = ChatOpenAI(temperature=0)  # or use your LLM instance
-
             chain = prompt | self.llm | output_parser
 
             # 7. Call the chain
@@ -149,7 +138,7 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
 
             questions_str = "\n".join(questions_list) if questions_list else "No questions generated."
 
-            final_summary = """## File Summary:\n\n##### File Name: {}\n##### File Format: {}\n##### Description:\n{}\n\n## Here are some questions that can be asked for EDA:\n{}.""".format(
+            final_summary = """### File Name: {}\n#### File Format: {}\n#### Description:\n{}\n\n#### Here are some questions that can be asked:\n{}.""".format(
                 file_name if file_name else "N/A",
                 file_format if file_format else "N/A",
                 summary_str,
@@ -160,38 +149,6 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
         except Exception as e:
             print(f"Error generating summary: {e}")
             # Handle the error gracefully, return empty strings or raise an exception
-            # You can also log the error if needed
             raise 
-            # Optionally, you can raise an exception or log the error
-            # raise e
-            # Or return empty values
-        # return ("", [], "")
+            
     
-
-if __name__ == "__main__":
-    # Example usage
-
-    # Initialize LLM
-    llm = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=os.getenv("OPENAI_API_KEY"))
-
-    df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
-    # global_dataframes.append(df_forcast)
-    df_summary_generator: GenerateFileSummary = DataFrameSummaryGenerator(llm=llm)
-    summary = df_summary_generator.generate_summary(df=df_forcast, file_name="forcast.xlsx", file_format="xlsx")
-    # Print the summary
-    print("Summary String:")
-    print(summary[0])  # summary_str
-    print("\nEDA Questions:")
-    print(summary[1])  # questions_list
-    print("\nFinal Summary:")
-    print(summary[2])
-
-    # Define the file path (you can change the name or path as needed)
-    file_path = "./output_summary.txt"
-
-    # Write the text to the file
-    with open(file_path, "w", encoding="utf-8") as file:
-        file.write(summary[2])
-
-    # Return the file path (optional)
-    print(f"Text written to: {file_path}")

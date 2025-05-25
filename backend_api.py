@@ -19,6 +19,65 @@ current_session = defaultdict(dict)
 # Initialize FastAPI app
 app = FastAPI()
 
+
+@app.delete("/delete_all_session")
+def delete_all_session()->JSONResponse:
+    """
+    Endpoint to delete all active sessions.
+    Returns:
+        JSONResponse: Response indicating the status of the operation.
+    """
+    try:
+        current_session.clear()
+        return JSONResponse(status_code = 200, content={"status": "success", "message": "All sessions reset successfully."})
+    except Exception as e:
+            return JSONResponse(status_code=400, content={"error": "Issue at backend during resetting all sessions. \nException: {e}"})
+
+@app.post("/delete_session")
+def delete_session(json_payload:dict)->JSONResponse:
+    """
+    Endpoint to delete a specific session based on session_id.
+    Args:
+        json_payload (dict): JSON payload containing session_id.
+    Returns:            
+        JSONResponse: Response indicating the status of the operation.
+    """
+
+    if "session_id" not in json_payload:
+        return JSONResponse(status_code=400, content={"error": "No session id key not provided  "})
+    
+    if json_payload["session_id"] not in current_session:
+        return JSONResponse(status_code=400, content={"error": "Session id not found in active sessions or may be incorrect."})
+    
+    try:
+        session_id = json_payload.get("session_id")
+        del current_session[session_id]
+        return JSONResponse(status_code = 200, content={"status": "success", "message": f"Session id {session_id} deleted successfully."})
+    except Exception as e:
+            return JSONResponse(status_code=400, content={"error": "Issue at backend during resetting all sessions. \nException: {e}"})
+    
+
+@app.delete("/delete_temp_file")
+async def delete_temp_file(json_payload:dict)->JSONResponse:
+
+    if "session_id" not in json_payload:
+        return JSONResponse(status_code=400, content={"error": "No session id provided"})
+    
+    session_id = json_payload.get("session_id")
+    if session_id not in current_session:
+        print(f"session id not found in current session: {session_id}")
+        return JSONResponse(status_code=400, content={"error": f"session id not found in current session: {session_id}"})
+    else:
+        file_paths = current_session[session_id]["file_paths"]
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"file deleted from path : {file_path}")
+            else:
+                print(f"file not found at path : {file_path}")
+
+        return JSONResponse(status_code=200, content={"message": "File deleted"})
+
 @app.post("/ask_question")
 def ask_question(json_payload: dict)-> JSONResponse:
     """
@@ -38,8 +97,6 @@ def ask_question(json_payload: dict)-> JSONResponse:
 
         if session_id not in current_session:
             return JSONResponse(status_code=400, content={"status": "error","error": "Session id not found in active sessions"})
-        
-
 
         response = current_session[session_id]["obj"].ask(question)
         print(f"\n\n answer from docqa: {response}")
@@ -48,23 +105,9 @@ def ask_question(json_payload: dict)-> JSONResponse:
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "error": f"issue at backend during question asking. \nException: {e}"})
     
-@app.post("/delete_temp_file")
-async def delete_temp_file(json_payload:dict):
-    
-    session_id = json_payload.get("session_id")
-    if not session_id:
-        return JSONResponse(status_code=400, content={"error": "No session id provided"})
-    else:
-        file_path = current_session[session_id]["file_path"]
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"file deleted from path : {file_path}")
-
-    return JSONResponse(status_code=200, content={"message": "File deleted"})
-
 
 @app.post("/upload_file")
-async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form(...))->JSONResponse :
+async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form(...))->JSONResponse:
     """
     Endpoint to upload a file and process it with DocQA.
     Args:
@@ -75,16 +118,15 @@ async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form
     """
     # Initialize the response variable
     data = json.loads(json_data)
+    if "session_id" not in data:
+        return JSONResponse(status_code=400, content={"error": "Key Error: session id key is missing."})
+    
     session_id = data["session_id"]
-    if not session_id:
-        return JSONResponse(status_code=400, content={"error": "No session id provided"})
-    if not file:
-        return JSONResponse(status_code=400, content={"error": "No file provided"})
-    
     if session_id not in current_session:
-        current_session[session_id] = {}
+        return JSONResponse(status_code=400, content={"error": "Session doesnot exist or wrong session id provided"})
+    if not files:
+        return JSONResponse(status_code=400, content={"error": "No file provided, please upload a file"})
     
-
     response = None
     try:
         preferred_dir = os.path.join(os.getcwd(), "temp")  # Use current working directory
@@ -94,7 +136,7 @@ async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form
         file_names = []
         file_types = []
         for file in files:
-            # contents = await file.read()
+           
             # Extract filename
             file_name = file.filename
             file_path = os.path.join(preferred_dir, file_name)
@@ -119,33 +161,37 @@ async def upload_file(files: List[UploadFile] = File(...), json_data: str = Form
         
 
         print(f"files received, session id created, {session_id}, file paths: {file_paths}")
-
-        # if session_id in current_session:
         
         current_session[str(session_id)]["file_paths"] = file_paths
         current_session[str(session_id)]["file_name"] = file_names
         current_session[str(session_id)]["input_content"] = file_types
 
+        # response = {
+        #     "status": "success",
+        #     "file_summary": "# All files received at backend Summary currently paused"
+        # }
         
-        # else:
-        #     return JSONResponse(status_code=400, content={"error": "session id not "})
-        response = current_session[str(session_id)]["obj"].load_document(file_path = current_session[str(session_id)]["file_path"], 
-                                                              file_type=current_session[str(session_id)]["file_type"], 
-                                                              file_name='forcast.xlsx')
+        response = current_session[str(session_id)]["obj"].load_document(file_paths = current_session[str(session_id)]["file_paths"], 
+                                                                         file_types = current_session[str(session_id)]["input_content"], 
+                                                                         file_names = current_session[str(session_id)]["file_name"])
         
         if response["status"] != "success":
             return JSONResponse(status_code=400, content={"error": f"Issue at backend during file load in DocQA Class. \nException: {response['message']}"})
         
 
         return JSONResponse(status_code=200, content={"message": "file received at backend", "file_summary": response["file_summary"]})
+        # return JSONResponse(status_code=200, content={"message": "file received at backend", "file_summary": "# All files received at backend Summary currently paused"})
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": f"issue at backend during file upload. \nException: {e}"})
-    
-    # return JSONResponse(status_code=200, content={"message": "file received at backend", "file_summary": response["file_summary"]})
 
 
 @app.get("/create_session")
-def create_session():
+def create_session()-> JSONResponse:
+    """
+    Endpoint to create a new session.
+    Returns:
+        JSONResponse: Response containing the session ID.
+    """
 
     try:
         session_id = uuid.uuid4().hex
@@ -157,49 +203,20 @@ def create_session():
     except Exception as e:
             return JSONResponse(status_code=400, content={"error": "issue at backend during session creation"})
     
-
-@app.post("/upload_multiple_files/")
-async def upload_files(files: List[UploadFile] = File(...)):
-    preferred_dir = os.path.join(os.getcwd(), "temp")  # Use current working directory
-    os.makedirs(preferred_dir, exist_ok=True)  # Ensure directory exists
-
-    file_paths = []
-    file_names = []
-    file_types = []
-    for file in files:
-        # contents = await file.read()
-        # Extract filename
-        file_name = file.filename
-        file_path = os.path.join(preferred_dir, file_name)
-
-        file_paths.append(file_path)
-        file_names.append(file_name)
-
-        # Write file to the preferred directory
-        with open(file_path, "wb") as buffer:
-            contents = await file.read()
-            buffer.write(contents)
-        print(f"\n\nFile saved to {file_path}, filename: {file_name}")
-
-        if session_id not in current_session:
-            current_session[session_id] = {}
-
-        print(f"file received, session id created, {session_id}, file path: {full_file_path}")
-
-        # if session_id in current_session:
-        
-        current_session[str(session_id)]["file_path"] = full_file_path
-        current_session[str(session_id)]["file_name"] = file_name
-        current_session[str(session_id)]["input_content"] = "file"
-
-        if file_name.endswith(".xlsx"):
-            current_session[str(session_id)]["file_type"] = "xlsx"
-        elif file_name.endswith(".csv"):
-            current_session[str(session_id)]["file_type"] = "csv"
-        
-    return {"files": results}
-
-
+@app.get("/get_active_sessions")
+def get_active_sessions()->JSONResponse:  
+    """
+    Endpoint to get the list of active sessions.
+    Returns:
+        JSONResponse: Response containing the list of active session IDs.
+    """
+    try:
+        active_sessions = list(current_session.keys()) if current_session else []
+        if not active_sessions:
+            return JSONResponse(status_code=200, content={"active_sessions": [], "message": "No active sessions found."})
+        return JSONResponse(status_code=200, content={"active_sessions": active_sessions})
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Issue at backend during fetching active sessions. \nException: {e}"})
 
 if __name__ == "__main__":
     uvicorn.run("backend_api:app", host="localhost", port=8000, reload=True, log_level="debug")
