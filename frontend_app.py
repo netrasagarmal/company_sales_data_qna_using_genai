@@ -1,28 +1,31 @@
-import streamlit as st
-import os
-import time
-import uuid
-import json
-import requests
+import os, time, uuid, json, requests
 from typing import List, Tuple, Dict, Union, Optional, Any
 from datetime import date
 from collections import defaultdict
+import streamlit as st
 
 # Initialize session state variables
 if 'messages' not in st.session_state:
     st.session_state.messages = []
+
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
+
 if 'welcome_done' not in st.session_state:
     st.session_state.welcome_done = False
+
 if 'file_uploaded' not in st.session_state:
     st.session_state.file_uploaded = False
+
 if 'text_pasted' not in st.session_state:
     st.session_state.text_pasted = False
+
 if 'session_id' not in st.session_state:
     st.session_state.session_id = None
+
 if 'file_names' not in st.session_state:
     st.session_state.file_names = defaultdict(dict)
+
 if 'text_content' not in st.session_state:
     st.session_state.text_content = None
 
@@ -32,8 +35,9 @@ if not st.session_state.welcome_done:
     st.write("This app allows you to upload a document or paste text, then ask questions about it.")
 
     
-    uploaded_files = None
+    uploaded_files:  = None
     pasted_text = None
+
     # Options for input
     input_method = st.radio("Choose your input method:", ("Upload a file (PDF, TXT, DOCX, XLSX, CSV)", "Paste text directly"))
     
@@ -90,14 +94,14 @@ if not st.session_state.welcome_done:
 
                     time.sleep(retry_delay)  # wait before next retry
 
+                # Check if session ID was created successfully
                 if create_session_response.status_code == 200 and st.session_state.session_id is not None:
+                    
                     upload_file_response = None
                     upload_text_response = None
 
-                    # print("\n\n\t uploaded file variable \n\t", uploaded_file)
-
+                    # If a file is uploaded or text is pasted, send it to the backend
                     if st.session_state.file_uploaded == True:
-                        print("\n\n\t inside file upload api \n\n")
                         json_payload = {"session_id":st.session_state.session_id}
                     
                         files = []
@@ -122,13 +126,10 @@ if not st.session_state.welcome_done:
 
                         content = json.loads(upload_file_response.content)
 
-                        print(f"\n\n upload file response content, {content}")
-
                         st.session_state.summary = content["file_summary"]
                         st.session_state.messages.append({"role": "assistant", "content": st.session_state.summary})
                         st.session_state.messages.append({"role": "assistant", "content": "You can now ask me questions about your document."})
                         # create session backend api
-                        print(f"\n\nfile_uploaded, {uploaded_files}")
                     
                     elif st.session_state.text_pasted == True:
                         print("\n\n\t inside abcdefgh \n\n")
@@ -141,14 +142,12 @@ if not st.session_state.welcome_done:
                             st.error("Failed to upload text. Please try again.")
                             st.rerun()
                         #create session backend api
-                        print("\n\ntext uploaded")
                         
 
                     if st.session_state.file_uploaded == True and upload_file_response.status_code == 200:
                         #delete file
                         delete_file_response = requests.delete("http://localhost:8000/delete_temp_file", json={"session_id": st.session_state.session_id})
                         content = json.loads(delete_file_response.content)
-                        print(f"\n\nfile deleted, {content}")
             
             st.rerun()
     
