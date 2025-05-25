@@ -11,3 +11,4 @@ langchain-tools
 faiss-cpu
 streamlit
 pandas
+tabulate

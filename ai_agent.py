@@ -11,8 +11,6 @@ from generate_summary import GenerateFileSummary, DataFrameSummaryGenerator
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from langchain.prompts import ChatPromptTemplate
 
-
-
 # Load .env values
 load_dotenv()
 
@@ -34,7 +32,10 @@ class DocQA:
         self.dataframes: Dict[str, pd.DataFrame] = {}
         self.df_agents: Dict[str, AgentExecutor] = {}
         self.files_knowledge_base: str = "These are the files in the knowledge base: \n\n"
-        self.all_files_summary: str = "# Uploaded Files Summary\n\n"
+        self.all_files_summary: str = "## Uploaded Files Summary\n\n"
+        self.state = {
+            "messages": [{"role": "system", "content": "You are a helpful assistant that answers questions based on the provided documents."}]
+        }
 
         # Build the state graph
         self.graph = self._build_graph()
@@ -98,11 +99,8 @@ class DocQA:
                 else:
                     raise ValueError("Unsupported file type. Please use 'xlsx', 'csv', or 'pdf'.")
                 
-                self.all_files_summary = self.all_files_summary + markdown_summary + "\n\n"
+                self.all_files_summary = self.all_files_summary + file_summary + "\n\n"
                 
-
-            
-            
         except Exception as e:
             print(f"Error loading document: {e}")
             return {"status":"exception", "message": f"Exception in DocQa, load_document().\n Exception: \n{str(e)}"}
@@ -157,8 +155,7 @@ class DocQA:
 
         return result["file_name"] if "file_name" in result and result["file_name"] != "None" else None
 
-
-    # Define the node logic
+    
     def get_answer_from_df(self, state: State) -> State:
         """
         Get answer from the DataFrame based on the user's question.
@@ -192,10 +189,10 @@ class DocQA:
             response = agent.invoke({question})
             print(response, type(response))
             print("\n\n\n")
+
+        self.state["messages"].append({"role": "assistant", "content": response["output"]})
         
-        return {
-            "messages": state["messages"] + [{"role": "assistant", "content": str(response["output"])}]
-        }
+        return self.state
     
     def _build_graph(self):
         """
@@ -224,35 +221,10 @@ class DocQA:
         """
 
         # Construct initial state
-        state = {
-            "messages": [{"role": "user", "content": question}]
-        }
+        # self.state = {
+        #     "messages": [{"role": "user", "content": question}]
+        # }
+        self.state["messages"].append({"role": "user", "content": question})
         # Run the graph and return final message
-        result = self.graph.invoke(state)
+        result = self.graph.invoke(self.state)
         return str(result["messages"][-1].content)
-
-qa_agent = None
-
-if __name__ == "__main__":
-
-    # df = pd.read_csv("sales_forecast.csv")
-    # df_forcast : pd.DataFrame = pd.read_excel('G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx')
-    qa_agent = DocQA()
-    print("DocQA agent initialized successfully.\n\n")
-    file_paths = [
-        'G:/company_sales_genai/company_sales_data_qna_using_genai/data/emp_data.csv',
-        'G:/company_sales_genai/company_sales_data_qna_using_genai/data/forcast.xlsx',
-        'G:/company_sales_genai/company_sales_data_qna_using_genai/data/wine.csv'
-    ]
-    file_types = ['csv', 'xlsx', 'csv']
-    file_names = ['emp_data.csv', 'forcast.xlsx', 'wine.csv']
-    x = qa_agent.load_document(file_paths=file_paths, file_types=file_types, file_names=file_names)
-    # Define the file path (you can change the name or path as needed)
-    file_path = "./output_summary.txt"
-    summ = str(x.get("file_summary", "No summary available."))
-    # Write the text to the file
-    with open(file_path, "w", encoding="utf-8") as file:
-        file.write(summ)
-
-    # Return the file path (optional)
-    print(f"Text written to: {file_path}")
