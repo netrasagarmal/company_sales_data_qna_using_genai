@@ -1,19 +1,14 @@
 from abc import ABC, abstractmethod
-import io
-from pydantic import BaseModel, Field
+import io, os, json
 from langchain.prompts import ChatPromptTemplate
 import pandas as pd
-import json
-import os
 from typing import List, Dict, Any, Tuple
-from pydantic import BaseModel, Field
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from langchain_community.chat_models import ChatOpenAI
 from dotenv import load_dotenv
 
 # Load environment variables from the .env file (if present)
 load_dotenv()
-
 
 # --- Abstract Base Class ---
 class GenerateFileSummary(ABC):
@@ -104,6 +99,7 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
             # 3. Get format instructions
             format_instructions = output_parser.get_format_instructions()
 
+            # LLM prompt template
             prompt_template = """
             You are a senior data analyst. Given the following information about a DataFrame:
 
@@ -125,19 +121,20 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
     
             prompt = ChatPromptTemplate.from_template(prompt_template)
 
+            # Create the chain with the LLM and output parser
             chain = prompt | self.llm | output_parser
 
-            # 7. Call the chain
+            # Step Invoke the chain with the basic info and format instructions
             result = chain.invoke({"basic_info": basic_info, "format_instructions" : format_instructions})
-
-            print("\n\n Result:", result, "Type:", type(result))
 
             # Result is parsed
             summary_str = result["summary"] if "summary" in result else "No summary generated."
+            
             questions_list = result["questions"] if "questions" in result else []
 
             questions_str = "\n".join(questions_list) if questions_list else "No questions generated."
 
+            # Format the final summary
             final_summary = """### File Name: {}\n#### File Format: {}\n#### Description:\n{}\n\n#### Here are some questions that can be asked:\n{}.""".format(
                 file_name if file_name else "N/A",
                 file_format if file_format else "N/A",
@@ -151,4 +148,3 @@ class DataFrameSummaryGenerator(GenerateFileSummary):
             # Handle the error gracefully, return empty strings or raise an exception
             raise 
             
-    
